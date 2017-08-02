@@ -14,6 +14,7 @@ mod segment_postings;
 mod intersection;
 mod union;
 mod union_all;
+mod difference;
 mod freq_handler;
 mod docset;
 mod segment_postings_option;
@@ -32,6 +33,7 @@ pub use self::segment_postings::{SegmentPostings, BlockSegmentPostings};
 pub use self::intersection::IntersectionDocSet;
 pub use self::union::UnionDocSet;
 pub use self::union_all::UnionAllDocSet;
+pub use self::difference::DifferenceDocSet;
 pub use self::freq_handler::FreqHandler;
 pub use self::segment_postings_option::SegmentPostingsOption;
 pub use common::HasLen;
@@ -87,8 +89,8 @@ mod tests {
 
         let heap = Heap::with_capacity(10_000_000);
         {
-            let mut segment_writer = SegmentWriter::for_segment(&heap, 18, segment.clone(), &schema)
-                .unwrap();
+            let mut segment_writer =
+                SegmentWriter::for_segment(&heap, 18, segment.clone(), &schema).unwrap();
             {
                 let mut doc = Document::default();
                 // checking that position works if the field has two values
@@ -134,9 +136,11 @@ mod tests {
             }
             {
                 let term_a = Term::from_field_text(text_field, "abcdef");
-                assert!(segment_reader
-                            .read_postings(&term_a, FreqAndPositions)
-                            .is_none());
+                assert!(
+                    segment_reader
+                        .read_postings(&term_a, FreqAndPositions)
+                        .is_none()
+                );
             }
             {
                 let term_a = Term::from_field_text(text_field, "a");
@@ -201,8 +205,10 @@ mod tests {
             assert!(index_writer.commit().is_ok());
         }
         index.load_searchers().unwrap();
-        let term_query = TermQuery::new(Term::from_field_text(text_field, "a"),
-                                        SegmentPostingsOption::NoFreq);
+        let term_query = TermQuery::new(
+            Term::from_field_text(text_field, "a"),
+            SegmentPostingsOption::NoFreq,
+        );
         let searcher = index.searcher();
         let mut term_weight = term_query.specialized_weight(&*searcher);
         term_weight.segment_postings_options = SegmentPostingsOption::FreqAndPositions;
@@ -437,11 +443,11 @@ mod tests {
         let segment_reader = searcher.segment_reader(0);
 
         b.iter(|| {
-                   let mut segment_postings = segment_reader
-                       .read_postings(&*TERM_A, SegmentPostingsOption::NoFreq)
-                       .unwrap();
-                   while segment_postings.advance() {}
-               });
+            let mut segment_postings = segment_reader
+                .read_postings(&*TERM_A, SegmentPostingsOption::NoFreq)
+                .unwrap();
+            while segment_postings.advance() {}
+        });
     }
 
     #[bench]
@@ -461,10 +467,12 @@ mod tests {
             let segment_postings_d = segment_reader
                 .read_postings(&*TERM_D, SegmentPostingsOption::NoFreq)
                 .unwrap();
-            let mut intersection = IntersectionDocSet::from(vec![segment_postings_a,
-                                                                 segment_postings_b,
-                                                                 segment_postings_c,
-                                                                 segment_postings_d]);
+            let mut intersection = IntersectionDocSet::from(vec![
+                segment_postings_a,
+                segment_postings_b,
+                segment_postings_c,
+                segment_postings_d,
+            ]);
             while intersection.advance() {}
         });
     }
@@ -486,10 +494,12 @@ mod tests {
             let segment_postings_d = segment_reader
                 .read_postings(&*TERM_D, SegmentPostingsOption::NoFreq)
                 .unwrap();
-            let mut intersection = IntersectionDocSet::from(vec![segment_postings_a,
-                                                                 segment_postings_b,
-                                                                 segment_postings_c,
-                                                                 segment_postings_d]);
+            let mut intersection = IntersectionDocSet::from(vec![
+                segment_postings_a,
+                segment_postings_b,
+                segment_postings_c,
+                segment_postings_d,
+            ]);
 
             let mut target = 0;
             while intersection.skip_next(target) != SkipResult::End {
@@ -515,13 +525,52 @@ mod tests {
             let segment_postings_d = segment_reader
                 .read_postings(&*TERM_D, SegmentPostingsOption::NoFreq)
                 .unwrap();
-            let mut union = UnionAllDocSet::from(vec![segment_postings_a,
-                                                      segment_postings_b,
-                                                      segment_postings_c,
-                                                      segment_postings_d]);
+            let mut union = UnionAllDocSet::from(vec![
+                segment_postings_a,
+                segment_postings_b,
+                segment_postings_c,
+                segment_postings_d,
+            ]);
 
             let mut target = 0;
             while union.skip_next(target) != SkipResult::End {
+                target += 10000;
+            }
+        });
+    }
+
+    #[bench]
+    fn bench_segment_difference(b: &mut Bencher) {
+        let searcher = INDEX.searcher();
+        let segment_reader = searcher.segment_reader(0);
+        b.iter(|| {
+            let segment_postings_a = segment_reader
+                .read_postings(&*TERM_A, SegmentPostingsOption::NoFreq)
+                .unwrap();
+            let segment_postings_b = segment_reader
+                .read_postings(&*TERM_B, SegmentPostingsOption::NoFreq)
+                .unwrap();
+            let mut difference = DifferenceDocSet::new(segment_postings_a, segment_postings_b);
+
+            while difference.advance() {}
+        });
+    }
+
+    #[bench]
+    fn bench_segment_difference_skip_next(b: &mut Bencher) {
+        let searcher = INDEX.searcher();
+        let segment_reader = searcher.segment_reader(0);
+        b.iter(|| {
+            let segment_postings_a = segment_reader
+                .read_postings(&*TERM_A, SegmentPostingsOption::NoFreq)
+                .unwrap();
+            let segment_postings_b = segment_reader
+                .read_postings(&*TERM_B, SegmentPostingsOption::NoFreq)
+                .unwrap();
+            let mut difference = DifferenceDocSet::new(segment_postings_a, segment_postings_b);
+
+            let mut target = 0;
+            while difference.skip_next(target) != SkipResult::End {
                 target += 10000;
             }
         });
