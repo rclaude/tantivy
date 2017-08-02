@@ -568,6 +568,65 @@ mod tests {
     }
 
     #[bench]
+    fn bench_segment_union(b: &mut Bencher) {
+        let searcher = INDEX.searcher();
+        let segment_reader = searcher.segment_reader(0);
+        b.iter(|| {
+            let segment_postings_a = segment_reader
+                .read_postings(&*TERM_A, SegmentPostingsOption::NoFreq)
+                .unwrap();
+            let segment_postings_b = segment_reader
+                .read_postings(&*TERM_B, SegmentPostingsOption::NoFreq)
+                .unwrap();
+            let segment_postings_c = segment_reader
+                .read_postings(&*TERM_C, SegmentPostingsOption::NoFreq)
+                .unwrap();
+            let segment_postings_d = segment_reader
+                .read_postings(&*TERM_D, SegmentPostingsOption::NoFreq)
+                .unwrap();
+            let mut union = UnionDocSet::from(vec![
+                segment_postings_a,
+                segment_postings_b,
+                segment_postings_c,
+                segment_postings_d,
+            ]);
+
+            while union.advance() {}
+        });
+    }
+
+    #[bench]
+    fn bench_segment_union_skip_next(b: &mut Bencher) {
+        let searcher = INDEX.searcher();
+        let segment_reader = searcher.segment_reader(0);
+        b.iter(|| {
+            let segment_postings_a = segment_reader
+                .read_postings(&*TERM_A, SegmentPostingsOption::NoFreq)
+                .unwrap();
+            let segment_postings_b = segment_reader
+                .read_postings(&*TERM_B, SegmentPostingsOption::NoFreq)
+                .unwrap();
+            let segment_postings_c = segment_reader
+                .read_postings(&*TERM_C, SegmentPostingsOption::NoFreq)
+                .unwrap();
+            let segment_postings_d = segment_reader
+                .read_postings(&*TERM_D, SegmentPostingsOption::NoFreq)
+                .unwrap();
+            let mut union = UnionDocSet::from(vec![
+                segment_postings_a,
+                segment_postings_b,
+                segment_postings_c,
+                segment_postings_d,
+            ]);
+
+            let mut target = 0;
+            while union.skip_next(target) != SkipResult::End {
+                target += 10000;
+            }
+        });
+    }
+
+    #[bench]
     fn bench_segment_difference(b: &mut Bencher) {
         let searcher = INDEX.searcher();
         let segment_reader = searcher.segment_reader(0);
