@@ -509,6 +509,34 @@ mod tests {
     }
 
     #[bench]
+    fn bench_segment_union_all(b: &mut Bencher) {
+        let searcher = INDEX.searcher();
+        let segment_reader = searcher.segment_reader(0);
+        b.iter(|| {
+            let segment_postings_a = segment_reader
+                .read_postings(&*TERM_A, SegmentPostingsOption::NoFreq)
+                .unwrap();
+            let segment_postings_b = segment_reader
+                .read_postings(&*TERM_B, SegmentPostingsOption::NoFreq)
+                .unwrap();
+            let segment_postings_c = segment_reader
+                .read_postings(&*TERM_C, SegmentPostingsOption::NoFreq)
+                .unwrap();
+            let segment_postings_d = segment_reader
+                .read_postings(&*TERM_D, SegmentPostingsOption::NoFreq)
+                .unwrap();
+            let mut union = UnionAllDocSet::from(vec![
+                segment_postings_a,
+                segment_postings_b,
+                segment_postings_c,
+                segment_postings_d,
+            ]);
+
+            while union.advance() {}
+        });
+    }
+
+    #[bench]
     fn bench_segment_union_all_skip_next(b: &mut Bencher) {
         let searcher = INDEX.searcher();
         let segment_reader = searcher.segment_reader(0);
