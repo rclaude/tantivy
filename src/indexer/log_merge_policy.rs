@@ -58,7 +58,7 @@ impl MergePolicy for LogMergePolicy {
             .enumerate()
             .collect::<Vec<(usize, u32)>>();
 
-        size_sorted_tuples.sort_by(|x, y| y.cmp(x));
+        size_sorted_tuples.sort_by(|x, y| y.1.cmp(&(x.1)));
 
         let size_sorted_log_tuples: Vec<_> = size_sorted_tuples
             .into_iter()
@@ -140,6 +140,21 @@ mod tests {
                               seg_meta(1000),
                               seg_meta(1000),
                               seg_meta(1000)];
+        let result_list = test_merge_policy().compute_merge_candidates(&test_input);
+        assert_eq!(result_list.len(), 2);
+    }
+
+    #[test]
+    fn test_log_merge_policy_levels_2() {
+        // multiple levels all get merged correctly
+        let test_input = vec![seg_meta(10),
+                              seg_meta(10),
+                              seg_meta(10),
+                              seg_meta(1000),
+                              seg_meta(1000),
+                              seg_meta(1000),
+                              seg_meta(10000),
+                              seg_meta(10)];
         let result_list = test_merge_policy().compute_merge_candidates(&test_input);
         assert_eq!(result_list.len(), 2);
     }
